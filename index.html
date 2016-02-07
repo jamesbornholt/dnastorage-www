@@ -1,0 +1,359 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="Content-Style-Type" content="text/css" />
+  <title>A DNA-Based Archival Storage System</title>
+  <link href='https://fonts.googleapis.com/css?family=Crimson+Text:400,700,400italic|Source+Sans+Pro:700' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="css/typebase.css">
+  <link rel="stylesheet" href="css/paper.css">
+</head>
+<body>
+<div id="header">
+<h1 class="title unnumbered">A DNA-Based Archival Storage System</h1>
+<ul class="authors">
+<li class="uw"><a href="https://homes.cs.washington.edu/~bornholt/">James Bornholt</a></li>
+<li class="uw"><a href="https://www.linkedin.com/in/randolph-manuel-lopez-barrezueta-807b3b34">Randolph Lopez</a></li>
+<li class="msr"><a href="https://www.linkedin.com/in/doug-carmean-078b66">Douglas M. Carmean</a></li>
+<li class="uw"><a href="https://homes.cs.washington.edu/~luisceze/">Luis Ceze</a></li>
+<li class="uw"><a href="https://homes.cs.washington.edu/~seelig/">Georg Seelig</a></li>
+<li class="msr"><a href="http://research.microsoft.com/en-us/people/kstrauss/">Karin Strauss</a></li>
+</ul>
+<p class="biblio">Originally published at <a href="https://www.ece.cmu.edu/calcm/asplos2016/">ASPLOS 2016</a> (<a href="https://homes.cs.washington.edu/~bornholt/papers/dnastorage-asplos16.pdf">original PDF</a>).</p>
+</div>
+<section>
+<p>Demand for data storage is growing exponentially, but the capacity of existing storage media is not keeping up. Using DNA to archive data is an attractive possibility because it is extremely dense, with a raw limit of 1 exabyte/mm³ (10⁹ GB/mm³), and long-lasting, with observed half-life of over 500 years.</p>
+
+<p>This paper presents an architecture for a DNA-based archival storage system. It is structured as a key-value store, and leverages common biochemical techniques to provide random access. We also propose a new encoding  scheme that offers controllable redundancy, trading off reliability for density. We demonstrate feasibility, random access, and robustness of the proposed encoding with wet lab experiments involving 151&nbsp;kB of synthesized DNA and a 42&nbsp;kB random-access subset, and simulation experiments of larger sets calibrated to the wet lab experiments. Finally, we highlight trends in biotechnology that indicate the impending practicality of DNA storage for much larger datasets.</p>
+</section>
+<section>
+<h1 id="introduction">Introduction</h1>
+<p>The “digital universe” (all digital data worldwide) is forecast to grow to over 16 zettabytes in 2017 <span class="citation">[14]</span>. Alarmingly, the exponential growth rate easily exceeds our ability to store it, even when accounting for forecast improvements in storage technologies. A significant fraction of this data is in archival form; for example, Facebook recently built an entire data center dedicated to 1 exabyte of cold storage <span class="citation">[18]</span>.</p>
+<p>Most of the world’s data today is stored on magnetic and optical media <span class="citation">[14]</span>. Tape technology has recently seen significant density improvements with tape cartridges as large as 185TB <span class="citation">[25]</span>, and is the densest form of storage available commercially today, at about 10GB/mm³. Recent research reported feasibility of optical discs capable of storing 1PB <span class="citation">[8]</span>, yielding a density of about 100GB/mm³. Despite this improvement, storing zettabytes of data would still take millions of units, and use significant physical space. But storage density is only one aspect of archival: durability is also critical. Rotating disks are rated for 3–5 years, and tape is rated for 10–30 years. Current long-term archival storage solutions require refreshes to scrub corrupted data, to replace faulty units, and to refresh technology. If we are to preserve the world’s data, we need to seek significant advances in storage density and durability.</p>
+<p>Synthetic DNA sequences have long been considered a potential medium for digital data storage <span class="citation">[6, 7, 10]</span>. DNA is an attractive possibility because it is extremely dense, with a theoretical limit above 1 EB/mm³ (eight orders of magnitude denser than tape), and long-lasting, with observed half-life of over 500 years in harsh environments <span class="citation">[2]</span>. DNA-based storage also has the benefit of eternal relevance: as long as there is DNA-based life, there will be strong reasons to read and manipulate DNA. The write process for DNA storage maps digital data into DNA nucleotide sequences (a nucleotide is the basic building block of DNA), <em>synthesizes</em> (manufactures) the corresponding DNA molecules, and stores them away. Reading the data involves <em>sequencing</em> the DNA molecules and decoding the information back to the original digital data. Both synthesis and sequencing are standard practice in biotechnology, from research to diagnostics and therapies.</p>
+<p>Progress in DNA storage has been rapid: in 1999, the state-of-the-art in DNA-based storage was encoding and recovering a 23 character message <span class="citation">[7]</span>; in 2013, researchers successfully recovered a 739kB message <span class="citation">[6, 10]</span>. This improvement of almost 2×/year has been fueled by exponential reduction in synthesis and sequencing cost and latency; growth in sequencing productivity eclipses even Moore’s Law <span class="citation">[4]</span>. The volume of data that can be synthesized today is limited mostly by the cost of synthesis and sequencing, but growth in the biotechnology industry portends orders of magnitude cost reductions and efficiency improvements.</p>
+<p>We think the time is ripe to consider DNA-based storage seriously and explore system designs and architectural implications. This paper presents an architecture for a DNA-backed archival storage system, modeled as a key-value store. A DNA storage system must overcome several challenges. First, DNA synthesis and sequencing is far from perfect, with error rates on the order of 1% per nucleotide. Sequences can also degrade while stored, further compromising data integrity. A key aspect of DNA storage is to devise appropriate encoding schemes that can tolerate errors by adding redundancy. Existing approaches have focused on redundancy but have ignored density implications. In this work we propose a new encoding scheme that offers controllable redundancy, enabling different types of data (e.g., text and images) to have different levels of reliability and density. The density of our encoding scheme outperforms existing work while providing similar reliability. Second, randomly accessing data in DNA-based storage is problematic, resulting in overall read latency that is much longer than write latency. Existing work has provided only large-block access: to read even a single byte from storage, the entire DNA pool must be sequenced and decoded. We propose a method for random access that uses a polymerase chain reaction (PCR) to amplify only the desired data, biasing sequencing towards that data. This design both accelerates reads and ensures that an entire DNA pool need not be sequenced. We demonstrate the feasibility of our system design with a series of wet lab experiments, in which we successfully stored data in DNA and performed random access to read back only selected values. We further evaluate our design using simulations to understand the error-correction characteristics of different encoding schemes, assess their overheads, and make projections about future feasibility based on technology trends. Our results demonstrate the impending practicality of DNA-based archival storage as a solution to exponential growth in demand for data storage.</p>
+</section>
+
+<section>
+<h1 id="sec:background">Background on DNA Manipulation</h1>
+<p><span class="paragraph">DNA basics.</span> Naturally occurring DNA consists of four types of nucleotides: adenine (A), cytosine (C), guanine (G), and thymine (T). A DNA strand, or <em>oligonucleotide</em>, is a linear sequence of these nucleotides. The two ends of a DNA strand, referred to as the 5′ and 3′ ends, are chemically different. DNA sequences are conventionally represented starting with the 5′ nucleotide end. The interactions between different strands are predictable based on sequence: two single strands can bind to each other and form a double helix if they are complementary: A in one strand aligns with T in the other, and likewise for C and G. The two strands in a double helix have opposite directionality (5′ end binds to the other strand’s 3′ end), and thus the two sequences are the “reverse complement” of each other. Two strands do not need to be fully complementary to bind to one another. Such <em>partial</em> complementarity is useful for applications in DNA nanotechnology and other fields, but can also result in undesired “crosstalk” between sequences in complex reaction mixtures containing many sequences.</p>
+<p><span class="paragraph">Selective DNA amplification with polymerase chain reaction (PCR).</span>PCR is a method for exponentially amplifying the concentration of selected sequences of DNA within a pool. A PCR reaction requires four main components: the template, sequencing primers, a thermostable polymerase and individual nucleotides that get incorporated into the DNA strand being amplified. The template is a single- or double-stranded molecule containing the (sub)sequence that will be amplified. The DNA sequencing primers are short synthetic strands that define the beginning and end of the region to be amplified. The polymerase is an enzyme that creates double-stranded DNA from a single-stranded template by “filling in” individual complementary nucleotides one by one, starting from a primer bound to that template. PCR happens in “cycles”, each of which doubles the number of templates in a solution. The process can be repeated until the desired number of copies is created.</p>
+<p><span class="paragraph">DNA synthesis.</span>Arbitrary single-strand DNA sequences can be synthesized chemically, nucleotide by nucleotide <span class="citation">[15, 17]</span>. The <em>coupling efficiency</em> of a synthesis process is the probability that a nucleotide binds to an existing partial strand at each step of the process. Although the coupling efficiency for each step can be higher than 99%, this small error still results in an exponential decrease of product yield with increasing length and limits the size of oligonucleotides that can be efficiently synthesized to about 200 nucleotides. In practice, synthesis of a given sequence uses a large number of parallel start sites and results in many truncated byproducts (the dominant error in DNA synthesis), in addition to many copies of the full length target sequence. Thus, despite errors in synthesizing any specific strand, a given synthesis batch will usually produce many perfect strands. Moreover, modern array synthesis techniques <span class="citation">[15]</span> can synthesize complex pools of nearly 10⁵ different oligonucleotides in parallel.</p>
+<p><span class="paragraph">DNA sequencing.</span>There are several high-throughput sequencing techniques, but the most popular methods (such as that used by Illumina) use DNA polymerase enzymes and are commonly referred to as “sequencing by synthesis”. The strand of interest serves as a template for the polymerase, which creates a complement of the strand. Importantly, <em>fluorescent</em> nucleotides are used during this synthesis process. Since each type of fluorescent nucleotide emits a different color, it is possible to read out the complement sequence optically. Sequencing is error-prone, but as with synthesis, in aggregate, sequencing typically produces enough precise reads of each strand.</p>
+<div class="figure">
+<a name="fig:carlson"></a>
+<img src="figs/carlson.png" />
+<p class="caption">Carlson curves <span class="citation">[4]</span>: trends in DNA synthesis and sequencing technology compared to Moore’s Law. DNA productivity is measured in nucleotides per person per day. Recent growth in sequencing technology eclipses Moore.</p>
+</div>
+<p><span class="paragraph">Sequencing and synthesis improvement projections.</span>Today, neither the performance nor the cost of DNA synthesis and sequencing is viable for data storage purposes. However, they have historically seen exponential improvements. Their cost reductions and throughput improvements have been compared to Moore’s Law in Carlson’s Curves <span class="citation">[4]</span>, as shown in <a href="#fig:carlson">Figure 1</a>. It shows that sequencing productivity has been growing faster than Moore’s Law. Important biotechnology applications such as genomics and the development of smart drugs are expected to continue driving these improvements, eventually making data storage a viable application.</p>
+</section>
+
+<section>
+<h1 id="a-dna-storage-system">A DNA Storage System</h1>
+<p>We envision DNA storage as the very last level of a deep storage hierarchy, providing very dense and durable archival storage with access times of many hours to days (<a href="#fig:hierarchy">Figure 2</a>). DNA synthesis and sequencing can be made arbitrarily parallel, making the necessary read and write bandwidths attainable. We now describe our proposal of a system for DNA-based storage with random access support.</p>
+<div class="figure">
+<a name="fig:hierarchy"></a>
+<img src="figs/hierarchy.png" />
+<p class="caption">DNA storage as the bottom level of the storage hierarchy</p>
+</div>
+<h2 id="overview">Overview</h2>
+<p>A DNA storage system consists of a DNA synthesizer that encodes the data to be stored in DNA, a storage container with compartments that store pools of DNA that map to a volume, and a DNA sequencer that reads DNA sequences and coverts them back into digital data. <a href="#fig:system-overview">Figure 3</a> shows an overview of the integrated system.</p>
+<div class="figure">
+<a name="fig:system-overview"></a>
+<img src="figs/system-overview.png" />
+<p class="caption">Overview of a DNA storage system.</p>
+</div>
+<p>The basic unit of DNA storage is a DNA strand that is roughly 100-200 nucleotides long, capable of storing 50-100 bits total. Therefore, a typical data object maps to a very large number of DNA strands. The DNA strands will be stored in “pools” that have stochastic spatial organization and do not permit structured addressing, unlike electronic storage media. Therefore, it is necessary to embed the address itself into the data stored in a strand. This way, after sequencing, one can reassemble the original data value. We discuss digital data representation in DNA in <a href="#sec:representation">Section 4</a>.</p>
+<div class="figure bigfig">
+<a name="fig:system-operation"></a>
+<img src="figs/system-write.png" />
+<img src="figs/system-read.png" />
+<p class="caption">Overview of a DNA storage system operation as a key-value store.</p>
+</div>
+<h2 id="interface-and-addressing">Interface and Addressing</h2>
+<p>A storage system needs a way to assign identification tags to data objects so they can be retrieved later. We choose a simple key-value architecture, where a <code>put(key, value)</code> operation associates <code>value</code> with <code>key</code>, and a <code>get(key)</code> operation retrieves the <code>value</code> assigned to <code>key</code>. To implement a key-value interface in a DNA storage system, we need: (1) a function that maps a key to the DNA pool (in the library) where the strands that contain data reside; and (2) a mechanism to selectively retrieve only desired portions of a pool (i.e, random access), since the DNA container will likely store significantly more data than the desired object.</p>
+<p>We implement random access by mapping a key to a pair of PCR primers. At write time, those primers are added to the strands. At read time, those same primers are used in PCR to amplify only the strands with the desired keys. Because the resulting pool will have a much higher concentration of the desired strands, a sample from that pool is very likely to contain all of those strands.</p>
+<p>Separating the DNA strands into a collection of pools (<a href="#fig:system-overview">Figure 3</a>) balances a trade-off between storage density, reliability, and performance. The most dense way to store data would be to have all strands in a single pool, but this arrangement sacrifices reliability for two reasons. First, a single pool requires many different primers to distinguish all keys, which increases the chance that two primers react poorly to each other. Second, a single pool reduces the likelihood that a random sample drawn during the read process will contain all the desired data. On the other hand, using a separate pool per key sacrifices density excessively. We therefore use a library of reasonably-sized pools, and use random access within each pool.</p>
+<h2 id="system-operation">System Operation</h2>
+<p><a href="#fig:system-operation">Figure 4</a> shows flowcharts for the write (<code>put</code>) and read (<code>get</code>) processes in more detail. The write process takes as input the key and value to store. It uses the key to obtain the PCR primer sequences, compute the high part of the address, and to determine the pool in the DNA library where the resulting strands will be stored. The low part of the address indexes the multiple strands generated by chunking the value (see <a href="#sec:chunk">Section 4.2</a>). Next, it encodes the data addresses, payloads, and error detection codes, and attaches the primer target sequences, to produce final DNA sequences for the synthesizer to manufacture. The resulting DNA molecules are stored in the storage library for archival.</p>
+<p>The read process takes as input a key. It uses the key to obtain the PCR primer sequences that identify molecules in the pool associated with that key. Next, the storage system physically extracts a sample from the DNA pool that contains the stored data, but likely also includes large amounts of unrelated data. The sample and the PCR primers are sent to the PCR thermocycler, which amplifies only the desired strands. The resulting pool goes to the DNA sequencer, which ultimately produces the digital data readout. Note that this process might be iterative since it may require multiple samples and sequencing steps to extract all the data associated with the desired keys. The DNA synthesizer is used for both producing the DNA strands that hold data payload as well as synthesizing the PCR primers used to amplify data during the random access read process.</p>
+<p>The read process removes a sample of DNA from the pool, and so cumulative reads reduce the quantity of DNA available for future operations. But DNA is easy to replicate, and so the pools can easily be replenished after read operations if necessary. If successive amplification is problematic, a pool can also be completely resynthesized after a read operation.</p>
+</section>
+
+<section>
+<h1 id="sec:representation">Representing Data in DNA</h1>
+<p>While DNA has many properties that make it different from existing storage media, there are parallels between traditional storage and DNA storage. At the lowest levels, traditional storage media store raw bits. The storage device abstracts the physical media, which could be magnetic state, or the charge in a capacitor, or the stable state of a flip-flop, and presents to the storage hierarchy raw digital data. In a similar way, the abstraction of DNA storage is the nucleotide: though a nucleotide is an organic molecule consisting of one base (A, C, G, or T) and a sugar-phosphate backbone, the abstraction of DNA storage is as a contiguous string of quaternary (base-4) numerals. This section describes the challenges of representing data in DNA, and presents several encodings that overcome these challenges.</p>
+<h2 id="representation">Representation</h2>
+<p>The obvious approach to store binary data in DNA is to encode the binary data in base 4, producing a string of <em>n</em>/2 quaternary digits from a string of <em>n</em> binary bits. The quaternary digits can then be mapped to DNA nucleotides (e.g., mapping 0, 1, 2, 3 to A, C, G, T, respectively). For example, the binary string 01110001 maps to the base-4 string 1301, and then to the DNA sequence . However, DNA synthesis and sequencing processes are prone to a wide variety of errors (substitutions, insertions, and deletions of nucleotides), requiring a more careful encoding.</p>
+<div class="figure">
+<a name="fig:representation"></a>
+<img src="figs/ternary.png" />
+<p class="subcaption">Translating binary data to DNA nucleotides via a Huffman code.</p>
+<img src="figs/trit-to-nt.png" class="smallfig" />
+<p class="subcaption">A rotating encoding to nucleotides avoids homopolymers (repetitions of the same nucleotide), which are error-prone.</p>
+<p class="caption">Encoding a stream of binary data as a stream of nucleotides. A Huffman code translates binary to ternary digits, and a rotating encoding translates ternary digits to nucleotides.</p>
+</div>
+<p>The likelihood of some forms of error can be reduced by encoding binary data in base 3 instead of base 4 <span class="citation">[10]</span>, as <a href="#fig:ternary">Figure 5</a> illustrates. Each ternary digit maps to a DNA nucleotide based on a rotating code that avoids repeating the same nucleotide twice. This encoding avoids <em>homopolymers</em>—repetitions of the same nucleotide that significantly increase the chance of sequencing errors <span class="citation">[20]</span>.</p>
+<p>Because base 3 is not a multiple of base 2, mapping directly between the bases would be inefficient: 6 ternary digits (3⁶ = 729) can store 9 bits of data (2⁹ = 512), but waste 217 possible states. Instead, we use a Huffman code <span class="citation">[13]</span> that maps each binary byte to either 5 or 6 ternary digits. For example, the Huffman code maps the binary string 01100001 to the base-3 string 01112. The rotating nucleotide encoding maps this string to the DNA sequence . The code maps more common ASCII characters to 5 digit strings, offering minor compression benefits for textual data, though the effect on overall storage density is insignificant.</p>
+<h2 id="sec:chunk">Data Format</h2>
+<p>Another practical issue with representing data in DNA is that current synthesis technology does not scale beyond sequences of low hundreds of nucleotides. Data beyond the hundreds of bits therefore cannot be synthesized as a single strand of DNA. In addition, DNA pools do not offer spatial isolation, and so a pool contains data for many different keys which are irrelevant to a single read operation. Isolating only the molecules of interest is non-trivial, and so existing DNA storage techniques generally sequence the entire solution, which incurs significant cost and time overheads.</p>
+<div class="figure">
+<a name="fig:organization"></a>
+<img src="figs/strand.png" />
+<p class="caption">An overview of the DNA data encoding format. After translating to nucleotides, the stream is divided into strands. Each strand contains a payload from the stream, together with addressing information to identify the strand and primer targets necessary for PCR and sequencing. </p>
+</div>
+<p>To overcome these two challenges, we organize data in DNA in a similar fashion to Goldman et al.&nbsp;<span class="citation">[10]</span>, as shown in <a href="#fig:organization">Figure 6</a>. Segmenting the nucleotide representation into blocks, which we synthesize as separate strands, allows storage of large values. Tagging those strands with identifying primers allows the read process to isolate molecules of interest and so perform random access. Below we describe these designs in detail.</p>
+<p><span class="paragraph">Payload.</span>The string of nucleotides representing the data to be stored is broken into data blocks, whose length depends on the desired strand length and the additional overheads of the format. To aid decoding, two sense nucleotides (“S” in <a href="#fig:organization">Figure 6</a>) indicate whether the strand has been reverse complemented (this is done to avoid certain pathological cases).</p>
+<p><span class="paragraph">Address.</span>Each data block is augmented with addressing information to identify its location in the input data string. The address space is in two parts. The high part of the address identifies the key a block is associated with. The low part of the address indexes the block within the value associated with that key. The combined address is padded to a fixed length and converted to nucleotides as described above. A parity nucleotide is added for basic error detection.</p>
+<p><span class="paragraph">Primers.</span>To each end of the strand, we attach primer sequences. These sequences serve as a “foothold” for the PCR process, and allow the PCR to selectively amplify only those strands with a chosen primer sequence.</p>
+<p><span class="paragraph">Random Access.</span>We exploit primer sequences to provide random access: by assigning different primers to different strands, we can perform sequencing on only a selected group of strands. Existing work on DNA storage uses a single primer sequence for all strands. While this design suffices for data recovery, it is inefficient: the entire pool (i.e., the strands for every key) must be sequenced to recover one value.</p>
+<p>To provide random access, we instead design a mapping from keys to unique primer sequences. All strands for a particular object share a common primer, and different strands with the same primer are distinguished by their different addresses. Primers allow random access via a polymerase chain reaction (PCR), which produces many copies of a piece of DNA in a solution. By controlling the sequences used as primers for PCR, we can dictate which strands in the solution are amplified. To read a particular key’s value from the solution, we simply perform a PCR process using that key’s primer, which amplifies the selected strands. The sequencing process then reads only those strands, rather than the entire pool. The amplification means sequencing can be faster and cheaper, because the probability of recovering the desired object is higher.</p>
+<p>Note that not all adapters and primers have the same behavior or effectiveness during PCR. Also, the actual sequences affect the PCR cycle temperatures. Discussing adapter and primer design is outside the scope of this paper. The hash function that maps addresses to primers can be implemented as a table lookup of primers that are known to work well and have known thermocycling temperatures. For this paper, we used primer designs from prior work <span class="citation">[24]</span>.</p>
+</section>
+
+<section>
+<h1 id="sec:encoding">Encodings for Reliable Storage</h1>
+<p>The previous sections described the organization of a DNA-based storage system, and in particular, how data can be broken into strands of DNA. However, the encoding implied by the previous section is naive: each bit of binary data is encoded in exactly one location in the output DNA strands, and so relies on the robustness of DNA for durability. A more robust design would provide redundancy at the data encoding level. This section discusses existing work on encodings for redundancy, highlights the reliability–density trade-off implicit in encoding design, and presents a new encoding with similar reliability to and yet higher density than existing work.</p>
+<h2 id="existing-encodings">Existing Encodings</h2>
+<p>Early work in DNA storage used encodings simpler than the one we describe above. For example, Bancroft et al.&nbsp;<span class="citation">[3]</span> translate text to DNA by means of a simple ternary encoding: each of the 26 English characters and a space character maps to a sequence of three nucleotides drawn from A, C, and T (so exactly 3³ = 27 characters can be represented). The authors successfully recovered a message of 106 characters, but this encoding suffers substantial overheads and poor reliability for longer messages.</p>
+<div class="figure">
+<a name="fig:goldman"></a>
+<img src="figs/goldman.png" />
+<p class="caption">An encoding proposed by Goldman et al.&nbsp;<span class="citation">[10]</span>. The payloads of each strand are overlapping segments of the input stream, such that each block in the stream appears in four distinct strands.</p>
+</div>
+<p><span class="paragraph">Goldman encoding.</span>We focus on an existing encoding proposed by Goldman et al.&nbsp;<span class="citation">[10]</span>, shown in <a href="#fig:goldman">Figure 7</a>. This encoding splits the input DNA nucleotides into overlapping segments to provide fourfold redundancy for each segment. Each window of four segments corresponds to a strand in the output encoding. The authors used this encoding to successfully recover a 739kB message. We use this encoding as a baseline because it is, to our knowledge, the most successful published DNA storage technique. In addition, it offers a tunable level of redundancy, by reducing the width of the segments and therefore repeating them more often in strands of the same length (for example, if the overlapping segments were half as long as in <a href="#fig:goldman">Figure 7</a>, they would be repeated in eight strands instead of four).</p>
+<h2 id="xor-encoding">XOR Encoding</h2>
+<div class="figure">
+<a name="fig:xor"></a>
+<img src="figs/xor.png" />
+<p class="caption">Our proposed encoding incorporates redundancy by taking the exclusive-or of two payloads to form a third. Recovering any two of the three strands is sufficient to recover the third.</p>
+</div>
+<p>While the Goldman encoding provides high reliability, it also incurs significant overhead: each block in the input string is repeated four times. We propose a simple new encoding that provides similar levels of redundancy to prior work, but with reduced overhead.</p>
+<p>Our encoding, shown in <a href="#fig:xor">Figure 8</a>, provides redundancy by a simple exclusive-or operation at the strand level. We take the exclusive-or <em>A</em> ⊕ <em>B</em> of the payloads <em>A</em> and <em>B</em> of two strands, which produces a new payload and so a new DNA strand. The address block of the new strand encodes the addresses of the input strands that were the inputs to the exclusive-or; the high bit of the address is used to indicate whether a strand is an original payload or an exclusive-or strand. This encoding provides its redundancy in a similar fashion to RAID 5: any two of the three strands <em>A</em>, <em>B</em>, and <em>A</em> ⊕ <em>B</em> are sufficient to recover the third.</p>
+<p>The reliability of this encoding is similar to that of Goldman. In <a href="#sec:experiments">Section 6</a>, we show that we successfully recovered objects from both encodings in a wet lab experiment. However, the theoretical density of this encoding is much higher than Goldman—where in their encoding each nucleotide repeats (up to) four times, in ours each nucleotide repeats an average of 1.5 times. In practice, the density difference is lower, due to the overheads of addressing and primers that are constant between the two encodings. Simulation results in <a href="#sec:simulation">Section 7</a> show our encoding to be twice as dense as that of Goldman, and for all practical DNA synthesis and sequencing technologies, it provides equivalent levels of reliability.</p>
+<h2 id="tunable-redundancy">Tunable Redundancy</h2>
+<p>Recent work in approximate storage <span class="citation">[12, 23]</span> shows that many applications do not need high-precision storage for every data structure. For example, while the header data of a JPEG file is critical to successful decoding, small errors in the payload are tolerable at the cost of some decoding imprecision.</p>
+<p>One key advantage of our encoding is that the level of redundancy is tunable at a per-block granularity. For critical data, we can provide high redundancy by pairing critical blocks with many other blocks: if <em>A</em> is critical, produce <em>A</em> ⊕ <em>B</em>, <em>A</em> ⊕ <em>C</em>, etc. On the other hand, for blocks that are less critical, we can further reduce their redundancy: instead of including only two blocks in an exclusive-or, we can include <em>n</em>, such that any <em>n</em> − 1 of the <em>n</em> blocks is sufficient to recover the last, at an average density overhead of 1/<em>n</em>.</p>
+<p>In addition to improving density, tunable redundancy has a significant effect on performance. Both DNA synthesis and sequencing are slower and more error-prone with larger datasets, and this error does not always grow linearly in size. It is often economically viable to synthesize smaller DNA pools with more accurate technology, while larger pools are out of reach. Tunable redundancy allows the storage system to optimize the balance between reliability and efficiency.</p>
+<h2 id="factors-in-encoding-design">Factors in Encoding Design</h2>
+<p>As with many encodings in the literature, ours ignores special properties of DNA synthesis and sequencing that make choosing an optimal encoding more complex. In particular, errors in synthesis and sequencing are not uniform: they vary according to location within a strand, and different sequences of nucleotides are more susceptible to undesired reactions.</p>
+<p>Synthesis error grows with the length of the strand being synthesized; nucleotides towards the end of the strand are more likely to be incorrect. Some of these errors are easily ignored, because they result in truncations, where the product strand is not of the correct length. Other errors are more insidious, with substitution errors being particularly common.</p>
+<p>An improved version of our encoding would tolerate variable substitution errors by not aligning the strands directly. For example, rather than computing <em>A</em> ⊕ <em>B</em>, we might instead compute <em>A</em> ⊕ <em>B</em>′, where <em>B</em>′ is <em>B</em> in reverse. Since nucleotides at the end of a strand are more error-prone, reversing one strand ensures that the average quality is (roughly) constant along the strand, so that each nucleotide has at least some redundancy information stored in a high-reliability position.</p>
+</section>
+
+<section>
+<h1 id="sec:experiments">Experiments</h1>
+<div class="figure">
+<a name="fig:images"></a>
+<img src="figs/sydney.png" class="smallfig" />
+<p class="subcaption"><code>sydney.jpg</code>, 24301 bytes</p>
+<img src="figs/cat.png" class="smallfig" />
+<p class="subcaption"><code>cat.jpg</code>, 11901 bytes</p>
+<img src="figs/smiley.png" class="smallfig" style="width: 30%; min-width: 100px" />
+<p class="subcaption"><code>smiley.jpg</code>, 5665 bytes</p>
+<p class="caption">Three image files we synthesized and sequenced for our experiments.</p>
+</div>
+<p>To demonstrate the feasibility of DNA storage with random access capabilities, we encoded four image files using the two encodings described in <a href="#sec:encoding">Section 5</a>. The files varied in size from 5kB to 84kB. We synthesized these files and sequenced the resulting DNA to recover the files. This section describes our experience with the synthesis and sequencing process, and presents results demonstrating that DNA storage is practical and that random access works. We used the results of our experiments to inform the design of a simulator, which we use in <a href="#sec:simulation">Section 7</a> to perform more experiments exploring the design space of data encoding and durability.</p>
+<h2 id="materials-and-method">Materials and Method</h2>
+<p>This section briefly describes the experimental protocol; see <a href="#app:method">Appendix A</a> for details.</p>
+<p>We used as input to the storage system four image files. For each image file <code>x.jpg</code>, we generated DNA sequences corresponding to the output of <code>put(x.jpg, ...)</code>. We performed these operations using two different encodings – the Goldman encoding and our proposed XOR encoding – described in <a href="#sec:encoding">Section 5</a>. Combined, the eight operations produced 45,652 sequences of length 120 nucleotides, representing 151kB of data. To demonstrate that DNA storage allows effective random access, we performed four <code>get</code> operations: selecting three of the four files encoded with the Goldman encoding, and one of the four encoded with the XOR encoding. The three files retrieved from the Goldman encoding are in <a href="#fig:images">Figure 9</a>; we also performed <code>get(sydney.jpg)</code> on the XOR-encoded data.</p>
+<p>The synthesized sequences were prepared for sequencing by amplification via the polymerase chain reaction (PCR) method. The product was sequenced using an Illumina MiSeq platform. The selected <code>get</code> operations total 16,994 sequences and 42kB. Sequencing produced 20.8M reads of sequences in the pool. We inspected the results and observed no reads of sequences that were not selected – so random access was effective in amplifying only the target files.</p>
+<h2 id="results">Results</h2>
+<p><span class="paragraph">File Recovery.</span>We successfully recovered all four files from the sequenced DNA. Three of the files were recovered without manual intervention. One file – <code>cat.jpg</code> encoded with the Goldman encoder – incurred a one-byte error in the JPEG header, which we fixed by hand. As described, the design of the Goldman encoder provides no redundancy for the first and last bytes of a file, and so this error was due to random substitution in either sequencing or synthesis. We could mitigate this error scenario by trivially extending that algorithm to wrap the redundant strands past the end of the file and back to the beginning.</p>
+<div class="figure">
+<a name="fig:sequencing-depth"></a>
+<img src="figs/all.png" />
+<p class="caption">Distribution of sequencing depths over all encoded strands.</p>
+</div>
+<p><span class="paragraph">Sequencing Depth.</span><a href="#fig:sequencing-depth">Figure 10</a> shows the distribution of sequencing depths over the 16,994 selected sequences. The sequencing depth of a strand is the number of times it was perfectly sequenced. Of the 20.8M reads from the sequencing run, 8.6M were error-free reads of a strand in the desired pool. The distribution of reads by sequence is heavily skewed with a mean depth of 506 and median depth of 128. These results suggest that encodings need to be robust not only to missing sequences (which get very few reads), but heavily amplified incorrect sequences.</p>
+<div class="figure">
+<a name="fig:depth-error"></a>
+<img src="figs/depth-error.png" />
+<p class="caption">Decoding accuracy as a function of sequencing depth.</p>
+</div>
+<p><span class="paragraph">Reduced Sequencing Depth.</span>The sequencing depth achieved in our experiment is more than sufficient to recover the encoded data. Sequencing technology can reduce sequencing depth in exchange for faster, higher-throughput results. To determine whether our encodings are still effective as sequencing depth reduces, we randomly subsampled the 20.8M reads we achieved and tried to decode <code>sydney.jpg</code> again, using both the Goldman and XOR encodings.</p>
+<p><a href="#fig:depth-error">Figure 11</a> shows that both encodings respond similarly to reduced sequencing depth. The <em>x</em>-axis plots the fraction of the 20.8M reads used, and the <em>y</em>-axis the accuracy of the decoded file. Both encodings tend to 25% accuracy as the depth reduces, as both decoders randomly guess one of the four nucleotides if no data is available. The accuracy of the two encodings is similar; however, the XOR encoding is higher density than the Goldman encoding.</p>
+<p><span class="paragraph">Naive Encoding.</span><a href="#fig:xor">Figure 8</a> shows that the XOR encoding is actually a superset of a naive encoding: if we ignore strands which are products <em>A</em> ⊕ <em>B</em>, we are left with only the naively encoded strands <em>A</em> and <em>B</em>. We attempted to decode <code>sydney.jpg</code> while ignoring the XOR products. We found that 11 strands were missing entirely, and even after improving the decoder to arbitrarily guess the values of missing strands, were not able to recover a valid JPEG file. The XOR encoding corrected all these errors at a lower density overhead than the Goldman encoding. These results suggest that even at very high sequencing depths, a naive encoding is not sufficient for DNA storage: encodings must provide their own robustness to errors.</p>
+</section>
+
+<section>
+<h1 id="sec:simulation">Simulation</h1>
+<p>We used the results of the experiments in <a href="#sec:experiments">Section 6</a> to inform the design of a simulator for DNA synthesis and sequencing. The simulator allows experimenting with new encodings and new configurations for existing encodings. This section uses the simulator to answer two questions about DNA storage: first, how do different encodings trade storage density for reliability, and second, what is the effect of decay on the reliability of stored data?</p>
+<div class="figure">
+<a name="fig:reliability-density"></a>
+<img src="figs/reliability-density_sydney.jpg.png" />
+<p class="caption">Reliability of encoded data as a function of storage density at different sequencing depths.</p>
+</div>
+<p><span class="paragraph">Reliability and Density.</span>The encodings we described in <a href="#sec:encoding">Section 5</a> can be reconfigured to provide either higher density or higher reliability. To examine this trade-off between different encodings, we encoded the <code>sydney.jpg</code> file (<a href="#fig:images">Figure 9</a>) with a variety of configurations. These configurations vary the number of strands where a piece of data is included, by changing the overlap between strands for Goldman and increasing the number of XOR copies for XOR. <a href="#fig:reliability-density">Figure 12</a> plots the density achieved by an encoding (<em>x</em>-axis) against decoding reliability (<em>y</em>-axis). The density is calculated as the file size divided by the total number of bases used to encode the file. <a href="#fig:reliability-density">Figure 12</a> includes three different encoding mechanisms: a naive encoding with no redundancy, the encoding proposed by Goldman, and our proposed XOR encoding. It presents the results for two sequencing depths, 1 and 3. Naive encoding has the lowest reliability because there is no redundancy. As the sequencing depth increases, the reliability improves, but as observed in the wet lab experiments, even at higher sequencing depths, the Naive encoding is not sufficient to provide full data recovery. For both tunable encodings, additional redundancy increases robustness, but affects density negatively. For sequencing depth of 1, where only a single copy of each strand is available, any error causes information loss if no redundancy is available (red dot). As more redundancy is added (blue and green curves), the encoding becomes more resilient to errors. At sequencing depth 1 and same density, Goldman is more resilient than XOR because it does not combine then replicate bits, it simply replicates them. As sequencing depths increase, XOR becomes as reliable as Goldman because the probability of having no copies at all of the original data lowers significantly.</p>
+<div class="figure">
+<a name="fig:strand-length"></a>
+<img src="figs/strand-length.png" />
+<p class="caption">Density of different encodings as a function of the length of each synthesized DNA strand. Dashed lines are asymptotes for infinite-length strands.</p>
+</div>
+<p><span class="paragraph">Density and Strand Length.</span>One limiting factor for DNA storage is strand length: current DNA synthesis technology can only viably produce strands of lengths less than 200, and our wet lab experiments (<a href="#sec:experiments">Section 6</a>) used strands of length 120. But future synthesis technology promises to increase this limit, as many fields of biology require longer artificial DNA sequences (for example, the average human gene has on the order of 10⁴ nucleotides).</p>
+<p><a href="#fig:strand-length">Figure 13</a> plots the density of different encodings on the <em>y</em>-axis as a function of the strand length on the <em>x</em>-axis. As strand length grows, addressing and other overheads become less significant, and density becomes a function only of the encoding. In the limit, the density of our XOR encoding is 2.6× that of Goldman, and yet our results show similar reliability. The XOR encoding is also two-thirds the density of a naive encoding, which suffers much worse error rates.</p>
+<div class="figure">
+<a name="fig:decay"></a>
+<img src="figs/decay.png" />
+<p class="caption">Average number of copies of sequences required to ensure a desired reliability over time.</p>
+</div>
+<p><span class="paragraph">Decay.</span>Finally, we used the simulator to evaluate the durability of DNA storage over time. The durability of electronic storage is, in the best case, in the tens of years. In contrast, the half life of single stranded DNA is much longer. To demonstrate the durability of DNA storage, we simulated decay at room temperature, according to rates observed in recent work <span class="citation">[11]</span>. Storage at lower temperatures significantly increases the half life of the stored DNA.</p>
+<p><a href="#fig:decay">Figure 14</a> shows desired timespan on the <em>x</em>-axis and the number of copies of each strand required to achieve a desired reliability after the timespan on the <em>y</em>-axis. Different curves correspond to different desired reliabilities. For example, the 99.99% reliability line says that to have a 99.99% chance of recovering an encoded value after 100 years, we need to store only 10 copies of the strands for that value. we need to store only 10 copies of the strands for that value. The results show that even very few copies are sufficient to provide high reliability long beyond the half lives of existing electronic media. In summary, high reliability for long time intervals does not have much impact on DNA storage density.</p>
+</section>
+
+<section>
+<h1 id="sec:discussion">Discussion and Future Work</h1>
+<p>The results in Sections <a href="#sec:experiments">6</a> and <a href="sec:simulation">7</a> demonstrate a full DNA storage system and its advantages. This section provides a more in-depth examination of experimental data and discusses potential improvements.</p>
+<p><span class="paragraph">The Real Source of Errors.</span>The results in <a href="#sec:experiments">Section 6</a> showed that error rates in a complete storage pipeline are high enough to require redundant encoding. This section shows where these errors come from, so that we can decide where to focus our attention when attempting to reduce errors.</p>
+<p>To answer this question, we synthesized a small subset of strands using a high fidelity on-column synthesis process (Single). In this process, each sequence is synthesized individually resulting in low error rate, but high cost and low throughput incompatible with information storage applications. In contrast, the results in <a href="#sec:experiments">Section 6</a> were generated using a high-throughput microarray-based synthesis process (Array) that is not high fidelity, but is currently among the lowest cost DNA synthesis alternatives.</p>
+<div class="figure">
+<a name="fig:ultramers"></a>
+<img src="figs/ultramers-2-Mutations.png" />
+<p class="caption">Distribution of DNA errors from two synthesis technologies. Because Single synthesis is effectively error-free, its results reflect sequencing error alone.</p>
+</div>
+<p><a href="#fig:ultramers">Figure 15</a> compares the overall error distribution for identical strands obtained through Single and Array synthesis as a function of the relative position within the strand. The overall error rate is due to both sequencing and synthesis errors. However, if we assume that the error rate for Single synthesis is near zero, we can interpret errors measured for those strands as solely due to sequencing. The difference between the error rates for the stands derived from Single and Array can then be interpreted as synthesis errors. We clearly see that sequencing error dominates for all locations: the sequencing error rate is on average an order of magnitude higher. These results show that future technology should focus on improving the accuracy of sequencing.</p>
+<p><span class="paragraph">Synthesis Efficiency.</span>In addition to incorrect strands, micro-array synthesis can produce <em>truncated</em> strands. Standard sequencing processes exclude these truncated strands, so they are unused for data recovery and represent waste.</p>
+<div class="figure">
+<a name="fig:length-dist"></a>
+<img src="figs/length-dist.png" />
+<p class="caption">Expected and observed distributions of strand length from DNA synthesis. Sequencing recovers only strands of the target length, but most of the synthesis product is not full length.</p>
+</div>
+<p>To illustrate the potential losses due to truncation, <a href="#fig:length-dist">Figure 16</a> shows the length distribution of the synthesized strands, as determined by gel electrophoresis (see <a href="#app:method">Appendix A</a> for details). Less than 5% of the pool is of the target length of 120 nucleotides – other strands are either truncated early, or (much more rarely) made longer. This indicates that work in reducing number of fragments could improve synthesis costs by up to about one order of magnitude.</p>
+<div class="figure">
+<a name="fig:hairpin"></a>
+<img src="figs/hairpin.png" />
+<p class="caption">A hairpin, in which a single sequence of DNA binds to itself because nearby regions are self-complementary. Hairpins make DNA amplification and sequencing more error prone.</p>
+</div>
+<p><span class="paragraph">Avoiding Bad Sequences.</span>The representation we (and others) have used does not avoid more complex sources of error in DNA data representation. For example, <a href="#fig:hairpin">Figure 17</a> shows a <em>hairpin</em>, in which a single sequence of DNA binds to itself, folding its two ends together because they are (partially) complementary. The binding of the two ends to each other prevents this strand from being easily amplified and sequenced. A more robust representation would avoid creating sequences that are self-complementary to reduce the chance of this self-hybridization. Of course, restricting self-complementarity also reduces the potential density of the representation, so it presents a trade-off between density and reliability.</p>
+<p>Similarly, if different strands are partially complementary, there is a chance they will bind to each other. A more robust encoding would try to mitigate this chance. For example, the mapping in <a href="#fig:ternary">Figure 5</a> from ternary digits to nucleotides need not be static. Instead, it could be selected on a per-strand basis by selecting the encoding that produces the least self-complementary and partially complementary strands.</p>
+<p>We intend to explore these directions as future work, but thus far these issues have had little effect on our experiments.</p>
+</section>
+
+<section>
+<h1 id="related-work">Related Work</h1>
+<p>Encoding data in DNA has a long line of research in the biology community. Early examples encoded and recovered very short messages: Clelland et al. recovered a 23 character message in 1999 <span class="citation">[7]</span>, and Leier et al. recover three 9-bit numbers in 2000 <span class="citation">[16]</span>. The first significant scaling improvements were made by Gibson et al. in 2010, successfully recovering 1280 characters encoded in a bacterial genome as “watermarks” <span class="citation">[9]</span> – but note this approach is <em>in vivo</em> (inside an organism), whereas ours is <em>in vitro</em> (outside), so the technology is very different and inapplicable to large-scale storage. More scaling improvements were made by Church et al. in 2012, who recovered a 643kB message <span class="citation">[6]</span>, and Goldman et al. recovered a 739kB message also in 2012 <span class="citation">[10]</span>. However, both these results required manual intervention: Church et al. had to manually correct ten bits of error, and Goldman et al. lost two sequences of 25 nucleotides.</p>
+<p>Most recently, Grass et al. recovered an 83kB message without error <span class="citation">[11]</span>. Their design uses a Reed-Solomon code <span class="citation">[22]</span>, striping the entire dataset across 5000 DNA strands. While this design leads to excellent redundancy, it defeats the desire for random access.</p>
+<p>Concurrent with our work, Yazdi et al.&nbsp;<span class="citation">[28]</span> developed a method for rewritable random-access DNA-based storage. Its encoding is dictionary-based and focuses on storage of text, while our approach accommodates arbitrary binary data. We do not support rewritability, which adds substantial complexity, because write-once is appropriate for archival items (e.g., photos) that are unlikely to change. If necessary, one can use a log-based approach for rewriting objects, since the density of DNA exceeds the overhead of logging.</p>
+<p>The use of DNA as a computing substrate also has a long history: in 1994, Adleman proposed composing Hamiltonian paths with DNA <span class="citation">[1]</span>. Researchers have proposed the use of DNA for Boolean circuits <span class="citation">[26]</span>, neural networks <span class="citation">[21]</span>, and chemical reaction networks <span class="citation">[5]</span>. DNA computing has also begun making inroads in the architecture community: Muscat et al. explore the architectural challenges of DNA strand-displacement circuits <span class="citation">[19]</span>, and Talawar examines the design of a DNA-based crossbar interconnection network <span class="citation">[27]</span>.</p>
+</section>
+
+<section>
+<h1 id="conclusion">Conclusion</h1>
+<p>DNA-based storage has the potential to be the ultimate archival storage solution: it is extremely dense and durable. While this is not practical yet due to the current state of DNA synthesis and sequencing, both technologies are improving at an exponential rate with advances in the biotechnology industry. Given the impending limits of silicon technology, we believe that hybrid silicon and biochemical systems are worth serious consideration: time is ripe for computer architects to consider incorporating biomolecules as an integral part of computer design. DNA-based storage is one clear example of this direction. Biotechnology has benefited tremendously from progress in silicon technology developed by the computer industry; perhaps now is the time for the computer industry to borrow back from the biotechnology industry to advance the state of the art in computer systems.</p>
+<h2 id="acknowledgements" class="unnumbered">Acknowledgements</h2>
+<p>We thank <a href="https://homes.cs.washington.edu/~bholt/">Brandon Holt</a>, <a href="https://homes.cs.washington.edu/~emina/">Emina Torlak</a>, <a href="https://homes.cs.washington.edu/~bholt/">Xi Wang</a>, and the anonymous reviewers for their feedback on earlier versions of this work; <a href="http://www.synthesis.cc/">Robert Carlson</a> for providing historic information on DNA synthesis and sequencing; and the members of the <a href="http://sampa.cs.washington.edu">Sampa</a>, <a href="http://misl.cs.washington.edu">Molecular Information Systems</a>, and <a href="http://homes.cs.washington.edu/~seelig/">Seelig</a> labs at UW, and the <a href="http://research.microsoft.com/en-US/projects/dnastorage/default.aspx">Emerging Storage and Computation</a> team at Microsoft Research, for their support of this project. This work was supported in part by NSF grants #1064497 and #1409831, gifts by Microsoft Research, and by the David Notkin Endowed Graduate Fellowship.</p>
+</section>
+
+<section>
+<a name="app:method"></a>
+<h1 id="app:method" class="unnumbered">A. Appendix: Materials and Method</h1>
+<p>Primers for the PCR reaction (<a href="#fig:pcr">Figure 18</a>) were designed to amplify specific files and also to incorporate sequence domains that are necessary for sequencing. Each primer incorporated overhangs that included three sequence domains in addition to the amplification domain necessary for PCR amplification. The first domain included the sequences necessary for binding to the Illumina flow cell during next generation sequencing. The second domain included a custom sequencing-priming region designed for the sequencing primer to bind. This region allows for sequencing of multiple files in the same sequencing run since the sequencing primer region becomes independent of the oligonucleotide pool. These sequences were generated using Nupack <span class="citation">[29]</span>, software for thermodynamic analysis of interacting nucleic acid strands, in order to avoid the formation of secondary structure that could interfere with the PCR reaction. The third domain consisted of a 12-nucleotide long degenerate region intended to optimize cluster detection in the Illumina sequencing platform.</p>
+<div class="figure">
+<a name="fig:pcr"></a>
+<img src="figs/pcr.png" />
+<p class="caption">PCR amplifies the strands in the file, and attaches new regions to each end that allow for sequencing.</p>
+</div>
+<p>PCR amplification was performed using Platinum PCR SuperMix High Fidelity MasterMix from Life Technologies. The cycling conditions were (i) <span>95</span> for 3 min, (ii) <span>95</span> for 20 s, (iii) <span>55</span> for 20 s, (iv) <span>72</span> for 160 s, and (v) looping through (ii)–(iv) 30 times. The PCR amplification output was purified via gel extraction and quantified before next generation sequencing. Finally, the product was sequenced using an Illumina MiSeq sequencing platform.</p>
+<p><span class="paragraph">Synthesis Efficiency.</span>To determine the results in <a href="#fig:length-dist">Figure 16</a>, which presents a distribution of strand lengths produced by synthesis, we designed a mathematical model to estimate the nucleotide <em>coupling efficiency</em>, which is the probability that a nucleotide will be added to the strand during each of the 120 coupling cycles in the synthesis process. The model says that the likelihood of observing a strand of length <em>n</em> is proportional to <em>Intensity</em>&nbsp;=&nbsp;<em>n</em>&nbsp;<em>N</em><sub><em>t</em></sub>&nbsp;<em>p</em><sup><em>n</em></sup>, where <em>N</em><sub><em>t</em></sub> is the total number of DNA molecules being synthesized in the array, <em>p</em> is the coupling efficiency, and <em>Intensity</em> is the observed flouresence measured from the gel electrophoresis shown in <a href="#fig:gel">Figure 19</a>. By fitting this model, we estimated the nucleotide coupling efficiency in the synthesis process to be approximately 0.975.</p>
+<div class="figure">
+<a name="fig:gel"></a>
+<img src="figs/gel.png" />
+<p class="caption">Gel electrophoresis results showing the distribution of strand lengths from the DNA synthesis process.</p>
+</div>
+</section>
+
+<section>
+<h1 id="refs">References</h1>
+<div class="references">
+<div id="ref-adleman">
+<p>[1] Adleman, L. 1994. Molecular computation of solutions to combinatorial problems. <em>Science</em>. 266, 5187 (1994), 1021–1024.</p>
+</div>
+<div id="ref-dnahalflife">
+<p>[2] Allentoft, M.E. et al. 2012. The half-life of DNA in bone: Measuring decay kinetics in 158 dated fossils. <em>Proceedings of the Royal Society of London B: Biological Sciences</em>. 279, 1748 (2012), 4724–4733.</p>
+</div>
+<div id="ref-bancroft">
+<p>[3] Bancroft, C. et al. 2001. Long-term storage of information in DNA. <em>Science</em>. 293, 5536 (2001), 1763–1765.</p>
+</div>
+<div id="ref-carlsoncurves">
+<p>[4] Carlson, R. 2014. Time for new DNA synthesis and sequencing cost curves. <a href="http://www.synthesis.cc/2014/02/time-for-new-cost-curves-2014.html" class="uri">http://www.synthesis.cc/2014/02/time-for-new-cost-curves-2014.html</a>.</p>
+</div>
+<div id="ref-controllers">
+<p>[5] Chen, Y.-J. et al. 2013. Programmable chemical controllers made from DNA. <em>Nature Nanotechnology</em>. 8, 10 (2013), 755–762.</p>
+</div>
+<div id="ref-church">
+<p>[6] Church, G.M. et al. 2012. Next-generation digital information storage in DNA. <em>Science</em>. 337, 6102 (2012), 1628.</p>
+</div>
+<div id="ref-microdots">
+<p>[7] Clelland, C.T. et al. 1999. Hiding messages in DNA microdots. <em>Nature</em>. 399, (1999), 533–534.</p>
+</div>
+<div id="ref-pbdvd">
+<p>[8] ExtremeTech 2013. New optical laser can increase DVD storage up to one petabyte. <a href="http://www.extremetech.com/computing/159245-new-optical-laser-can-increase-dvd-storage-up-to-one-petabyte" class="uri">http://www.extremetech.com/computing/159245-new-optical-laser-can-increase-dvd-storage-up-to-one-petabyte</a>.</p>
+</div>
+<div id="ref-gibson">
+<p>[9] Gibson, D.G. et al. 2010. Creation of a bacterial cell controlled by a chemically synthesized genome. <em>Science</em>. 329, 5987 (2010), 52–56.</p>
+</div>
+<div id="ref-goldman">
+<p>[10] Goldman, N. et al. 2013. Towards practical, high-capacity, low-maintenance information storage in synthesized DNA. <em>Nature</em>. 494, (2013), 77–80.</p>
+</div>
+<div id="ref-grass">
+<p>[11] Grass, R.N. et al. 2015. Robust chemical preservation of digital information on DNA in silica with error-correcting codes. <em>Angew. Chem. Int. Ed.</em> 54, (2015), 2552–2555.</p>
+</div>
+<div id="ref-approximage">
+<p>[12] Guo, Q. et al. 2016. High-density image storage using approximate memory cells. <em>ASPLOS</em> (2016).</p>
+</div>
+<div id="ref-huffman">
+<p>[13] Huffman, D. 1952. A method for the construction of minimum-redundancy codes. <em>Proceedings of the IRE</em>. 40, 9 (1952), 1098–1101.</p>
+</div>
+<div id="ref-idcinfographic">
+<p>[14] IDC 2013. Where in the world is storage. <a href="http://www.idc.com/downloads/where_is_storage_infographic_243338.pdf" class="uri">http://www.idc.com/downloads/where_is_storage_infographic_243338.pdf</a>.</p>
+</div>
+<div id="ref-denovo">
+<p>[15] Kosuri, S. and Church, G.M. 2014. Large-scale de novo DNA synthesis: Technologies and applications. <em>Nature Methods</em>. 11, (2014), 499–507.</p>
+</div>
+<div id="ref-leier">
+<p>[16] Leier, A. et al. 2000. Cryptography with DNA binary strands. <em>Biosystems</em>. 57, 1 (2000), 13–22.</p>
+</div>
+<div id="ref-caruthers">
+<p>[17] Matteucci, M.D. and Caruthers, M.H. 1981. Synthesis of deoxyoligonucleotides on a polymer support. <em>Journal of the American Chemical Society</em>. 103, 11 (1981), 3185–3191.</p>
+</div>
+<div id="ref-face2013">
+<p>[18] Miller, R. 2013. Facebook builds exabyte data centers for cold storage. <a href="http://www.datacenterknowledge.com/archives/2013/01/18/facebook-builds-new-data-centers-for-cold-storage/" class="uri">http://www.datacenterknowledge.com/archives/2013/01/18/facebook-builds-new-data-centers-for-cold-storage/</a>.</p>
+</div>
+<div id="ref-circuits">
+<p>[19] Muscat, R.A. et al. 2013. DNA-based molecular architecture with spatially localized components. <em>International symposium on computer architecture</em> (2013).</p>
+</div>
+<div id="ref-niedringhaus">
+<p>[20] Niedringhaus, T.P. et al. 2011. Landscape of next-generation sequencing technologies. <em>Anal. Chem.</em> 83, 12 (2011), 4327–4341.</p>
+</div>
+<div id="ref-nn">
+<p>[21] Qian, L. et al. 2011. Neural network computation with DNA strand displacement cascades. <em>Science</em>. 475, 7356 (2011), 368–372.</p>
+</div>
+<div id="ref-rs">
+<p>[22] Reed, I.S. and Solomon, G. 1960. Polynomial codes over certain finite fields. <em>Journal of the Society for Industrial and Applied Mathematics</em>. 8, 2 (1960), 300–304.</p>
+</div>
+<div id="ref-approxstorage">
+<p>[23] Sampson, A. et al. 2013. Approximate storage in solid-state memories. <em>International symposium on microarchitecture</em> (2013).</p>
+</div>
+<div id="ref-shendure">
+<p>[24] Schwartz, J.J. et al. 2012. Accurate gene synthesis with tag-directed retrieval of sequence-verified DNA molecules. <em>Nature Methods</em>. 9, 9 (2012), 913–915.</p>
+</div>
+<div id="ref-sonytape">
+<p>[25] Sony 2014. Sony develops magnetic tape technology with the world’s highest recording density. <a href="http://www.sony.net/SonyInfo/News/Press/201404/14-044E/" class="uri">http://www.sony.net/SonyInfo/News/Press/201404/14-044E/</a>.</p>
+</div>
+<div id="ref-chain">
+<p>[26] Takahashi, K. et al. 2006. Chain reaction systems based on loop dissociation of DNA. <em>DNA computing</em>. Springer Berlin Heidelberg. 347–358.</p>
+</div>
+<div id="ref-crossbar">
+<p>[27] Talawar, B. 2015. A crossbar interconnection network in DNA. <em>Workshop on high performance computational biology</em> (2015).</p>
+</div>
+<div id="ref-olgica">
+<p>[28] Yazdi, S.M.H.T. et al. 2015. A Rewritable, Random-Access DNA-Based Storage System. <em>Nature Scientific Reports</em>. 5, 14318 (2015).</p>
+</div>
+<div id="ref-nupack">
+<p>[29] Zadeh, J.N. et al. 2011. Nucleic acid sequence design via efficient ensemble defect optimization. <em>Journal of Computational Chemistry</em>. 32, 3 (2011), 439–452.</p>
+</div>
+</div>
+</section>
+</body>
+</html>
