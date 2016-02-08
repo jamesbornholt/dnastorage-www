@@ -127,6 +127,9 @@ p.subcaption {
 }
 
 /* citations */
+.references {
+    word-wrap: break-word;
+}
 #refbox {
     width: 400px;
     border: 1px solid black;
@@ -135,4 +138,17 @@ p.subcaption {
     position: absolute;
     border-radius: 5px 5px;
     word-wrap: break-word;
+}
+
+/* mobile */
+@media only screen and (max-device-width: 700px) {
+    html {
+        font-size: 1.2rem;
+    }
+    body {
+        margin: 0.5em;
+    }
+    #refbox {
+        display: none;
+    }
 }
