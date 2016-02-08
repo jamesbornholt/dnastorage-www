@@ -6,8 +6,7 @@ html {
 
 body {
     max-width: 770px;
-    margin-left: 4em;
-    margin-top: 4em;
+    margin: 4em;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -101,9 +100,6 @@ p.caption::before {
 }
 
 /* figures */
-
-div.figure {
-}
 div.figure, div.figure img {
     margin: 1rem auto 1rem auto;
     display: block;
@@ -128,4 +124,15 @@ p.subcaption {
     font-size: 80%;
     line-height: 1.1rem;
     text-align: center;
+}
+
+/* citations */
+#refbox {
+    width: 400px;
+    border: 1px solid black;
+    background: white;
+    padding: 0.5em;
+    position: absolute;
+    border-radius: 5px 5px;
+    word-wrap: break-word;
 }
